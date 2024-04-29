@@ -8,9 +8,13 @@
 package SymbolPuzzleQuestions;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Stack;
 import java.util.Random;
 import console.Console;
 
@@ -68,19 +72,21 @@ class Puzzle {
 		}
 		allowedPatterns = new ArrayList<>();
 		allowedSymbols = new ArrayList<>();
-		Pattern qPattern = new Pattern("Q", "QQ**Q**QQ");
+
+		Pattern qPattern = new Pattern("Q", "QQ**Q**QQ" , getRandomInt(1, 4));
 		allowedPatterns.add(qPattern);
 		allowedSymbols.add("Q");
-		Pattern xPattern = new Pattern("X", "X*X*X*X*X");
+		Pattern xPattern = new Pattern("X", "X*X*X*X*X" , getRandomInt(1, 4));
 		allowedPatterns.add(xPattern);
 		allowedSymbols.add("X");
-		Pattern tPattern = new Pattern("T", "TTT**T**T");
+		Pattern tPattern = new Pattern("T", "TTT**T**T" , getRandomInt(1, 4));
 		allowedPatterns.add(tPattern);
 		allowedSymbols.add("T");
 
-		Pattern cPattern = new Pattern("C" , "CCC*CCCC");
+		Pattern cPattern = new Pattern("C" , "CCC*CCCC" , getRandomInt(1, 4));
 		allowedPatterns.add(cPattern);
 		allowedSymbols.add("C");
+
 
 	}
 
@@ -95,7 +101,7 @@ class Puzzle {
 			int noOfPatterns = Integer.parseInt(scan.nextLine());
 			for (int count = 0; count < noOfPatterns; count++) {
 				String[] items = scan.nextLine().split(",", 2);
-				Pattern p = new Pattern(items[0], items[1]);
+				Pattern p = new Pattern(items[0], items[1], getRandomInt(1 , 4));
 				allowedPatterns.add(p);
 			}
 			gridSize = Integer.parseInt(scan.nextLine());
@@ -124,45 +130,206 @@ class Puzzle {
 		boolean finished = false;
 		while (!finished) {
 			displayPuzzle();
+
+			Console.writeLine();
+			outputPatternCount();
+			Console.writeLine();
+
 			Console.writeLine("Current score: " + score);
-			int row = -1;
-			boolean valid = false;
-			while (!valid) {
-				Console.write("Enter row number: ");
-				try {
-					row = Integer.parseInt(Console.readLine());
-					valid = true;
-				} catch (Exception e) {
+
+			Console.writeLine("Symbols left: " + symbolsLeft);
+
+			Console.writeLine("Would you like to remove a symbol? y/n: ");
+			String szChoice = Console.readLine();
+
+			if(szChoice.equalsIgnoreCase("y"))
+			{
+				int row = inputAxis("Enter the row number of the symbol you would like to remove: ");
+				int column = inputAxis("Enter the column number of the symbol you would like to remove: ");
+
+				removeSymbol(row, column);
+
+			}
+			else
+			{
+
+				int row = inputAxis("Enter row number: ");
+				int column = inputAxis("Enter column number: ");
+
+				String symbol = getSymbolFromUser();
+				symbolsLeft -= 1;
+				Cell currentCell = getCell(row, column);
+				if (currentCell.checkSymbolAllowed(symbol)) 
+				{
+					for (Pattern p : allowedPatterns) {
+
+						if (symbol.charAt(0) == p.getSymbol()) 
+						{
+
+							if(p.getAttempts() == 0)
+							{
+								outputPatternWarning(p);
+							}
+							else
+							{
+								currentCell.changeSymbolInCell(symbol);
+								int amountToAddToScore = checkForMatchWithPattern(row, column);
+								if (amountToAddToScore > 0) 
+								{
+									score += amountToAddToScore;
+								}
+
+							}
+						}
+					}
+
+				}
+
+				if (symbolsLeft == 0) {
+					finished = true;
 				}
 			}
-			int column = -1;
-			valid = false;
-			while (!valid) {
-				Console.write("Enter column number: ");
-				try {
-					column = Integer.parseInt(Console.readLine());
-					valid = true;
-				} catch (Exception e) {
+
+			Console.writeLine("Would you like to save your current game? y/n: ");
+			szChoice = Console.readLine();
+
+			if(szChoice.equalsIgnoreCase("y"))
+			{
+				Console.writeLine("Please input the filename: ");
+				String szFilename = Console.readLine();
+
+				try
+				{
+					savePuzzle(szFilename);
+
 				}
-			}
-			String symbol = getSymbolFromUser();
-			symbolsLeft -= 1;
-			Cell currentCell = getCell(row, column);
-			if (currentCell.checkSymbolAllowed(symbol)) {
-				currentCell.changeSymbolInCell(symbol);
-				int amountToAddToScore = checkForMatchWithPattern(row, column);
-				if (amountToAddToScore > 0) {
-					score += amountToAddToScore;
+				catch (IOException e)
+				{
+					e.printStackTrace();
+
 				}
+
 			}
-			if (symbolsLeft == 0) {
-				finished = true;
-			}
+
 		}
+
+		Console.writeLine();
 		Console.writeLine();
 		displayPuzzle();
+		outputPatternCount();
+		Console.writeLine();
 		Console.writeLine();
 		return score;
+	}
+
+	private void savePuzzle(String szName) throws IOException
+	{
+		try
+		{
+			File saveFile = new File(szName + ".txt");
+			FileWriter Stream = new FileWriter(saveFile);
+
+			// Symbol numbers and types
+			saveFile.createNewFile();
+
+			Stream.write(allowedSymbols.size() + "\n");
+
+			for (int i = 0 ; i < allowedSymbols.size() ; i++)
+			{
+				Stream.write(allowedSymbols.get(i) + "\n");
+
+			}
+
+
+			// Pattern numbers and types
+			Stream.write(allowedPatterns.size() + "\n");
+
+			for (int i = 0 ; i < allowedPatterns.size() ; i++)
+			{
+				Stream.write(allowedSymbols.get(i) + "," + allowedPatterns.get(i).getPatternSequence() + "\n");
+
+			}
+
+			// Grid size
+			Stream.write(gridSize + "\n");
+
+			//Grid Contents
+			for (int i = 0; i < grid.size(); i++)
+			{
+				if(grid.get(i).getSymbol().equals("-"))
+				{
+					Stream.write(",\n");
+
+				}
+				else
+				{
+					Stream.write(grid.get(i).getSymbol() + "\n");
+
+				}
+
+			}
+			
+			Stream.write(score + "\n");
+			Stream.write(Integer.toString(symbolsLeft));
+
+			Stream.close();
+
+		}
+		catch (IOException e)
+		{
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+
+		}
+
+	}
+
+	private void removeSymbol(int iRow , int iCol)
+	{
+		boolean bValidRemove = false;
+
+		for (int i = 0; i < allowedSymbols.size(); i++) 
+		{			
+			if (getCell(iRow , iCol).symbol.charAt(0) == allowedSymbols.get(i).charAt(0) 
+					&& 
+					!getCell(iRow , iCol).symbolsNotAllowed.contains(getCell(iRow, iCol).symbol)) 
+			{
+				bValidRemove = true;
+				break;
+
+			}
+		}
+
+		if(bValidRemove == true)
+		{
+			getCell(iRow , iCol).changeSymbolInCell("-");
+			symbolsLeft -= 1;
+
+		}
+		else
+		{
+			Console.writeLine("Invalid removal of symbol!");
+
+		}
+
+	}
+
+	private int inputAxis(String szMessage)
+	{
+		int axis = -1;
+		boolean valid = false;
+		while (!valid) {
+			Console.write(szMessage);
+			try {
+				axis = Integer.parseInt(Console.readLine());
+				valid = true;
+			} catch (Exception e) {
+
+			}
+		}
+
+		return axis;
+
 	}
 
 	private Cell getCell(int row, int column) {
@@ -170,22 +337,46 @@ class Puzzle {
 	}
 
 	public int checkForMatchWithPattern(int row, int column) {
+		boolean bOffGrid = false;
+
 		for (int startRow = row + 2; startRow >= row; startRow--) {
 			for (int startColumn = column - 2; startColumn <= column; startColumn++) {
+
 				try {
+
+
+					if(getCell(startRow, startColumn).symbolsNotAllowed.contains(getCell(startRow, startColumn).getSymbol()))
+					{
+						return(0);
+					}
+
 					String patternString = "";
-					patternString += getCell(startRow, startColumn).getSymbol();
-					patternString += getCell(startRow, startColumn + 1).getSymbol();
-					patternString += getCell(startRow, startColumn + 2).getSymbol();
-					patternString += getCell(startRow - 1, startColumn + 2).getSymbol();
-					patternString += getCell(startRow - 2, startColumn + 2).getSymbol();
-					patternString += getCell(startRow - 2, startColumn + 1).getSymbol();
-					patternString += getCell(startRow - 2, startColumn).getSymbol();
-					patternString += getCell(startRow - 1, startColumn).getSymbol();
-					patternString += getCell(startRow - 1, startColumn + 1).getSymbol();
+
+					if (bOffGrid == true)
+					{
+						patternString += null;
+
+					}
+					else
+					{
+						patternString += getCell(startRow, startColumn).getSymbol();
+						patternString += getCell(startRow, startColumn + 1).getSymbol();
+						patternString += getCell(startRow, startColumn + 2).getSymbol();
+						patternString += getCell(startRow - 1, startColumn + 2).getSymbol();
+						patternString += getCell(startRow - 2, startColumn + 2).getSymbol();
+						patternString += getCell(startRow - 2, startColumn + 1).getSymbol();
+						patternString += getCell(startRow - 2, startColumn).getSymbol();
+						patternString += getCell(startRow - 1, startColumn).getSymbol();
+						patternString += getCell(startRow - 1, startColumn + 1).getSymbol();
+
+					}
+
 					for (Pattern p : allowedPatterns) {
 						String currentSymbol = getCell(row, column).getSymbol();
-						if (p.matchesPattern(patternString, currentSymbol)) {
+
+						if (p.matchesPattern(patternString, currentSymbol)) 
+						{
+
 							getCell(startRow, startColumn).addToNotAllowedSymbols(currentSymbol);
 							getCell(startRow, startColumn + 1).addToNotAllowedSymbols(currentSymbol);
 							getCell(startRow, startColumn + 2).addToNotAllowedSymbols(currentSymbol);
@@ -195,12 +386,23 @@ class Puzzle {
 							getCell(startRow - 2, startColumn).addToNotAllowedSymbols(currentSymbol);
 							getCell(startRow - 1, startColumn).addToNotAllowedSymbols(currentSymbol);
 							getCell(startRow - 1, startColumn + 1).addToNotAllowedSymbols(currentSymbol);
+
+							p.usePattern();
+
 							return 10;
 						}
+
 					}
 				} catch (Exception e) {
 				}
+
+				if ((startColumn + 1) == gridSize)
+				{
+					bOffGrid = true;
+				}
+
 			}
+
 		}
 		return 0;
 	}
@@ -212,6 +414,24 @@ class Puzzle {
 			symbol = Console.readLine();
 		}
 		return symbol;
+	}
+
+	private void outputPatternCount() 
+	{
+		for (int i = 0; i < allowedPatterns.size(); i++) 
+		{
+			Console.write("The attempts you have left on pattern " + allowedPatterns.get(i).getSymbol() + " is " + allowedPatterns.get(i).getAttempts());
+			Console.writeLine();
+		}
+
+	}
+
+	private void outputPatternWarning(Pattern p) 
+	{
+		Console.writeLine();
+		Console.write("You have used all allowed pattern " + p.getSymbol() + "'s up!");
+		Console.writeLine();
+
 	}
 
 	private String createHorizontalLine() {
@@ -253,9 +473,14 @@ class Pattern {
 	private String symbol;
 	private String patternSequence;
 
-	public Pattern(String symbolToUse, String patternString) {
+	private int patternCount;
+
+	public Pattern(String symbolToUse, String patternString , int iAttempts) {
 		symbol = symbolToUse;
 		patternSequence = patternString;
+
+		patternCount = iAttempts;
+
 	}
 
 	public boolean matchesPattern(String patternString, String symbolPlaced) {
@@ -274,6 +499,25 @@ class Pattern {
 	public String getPatternSequence() {
 		return patternSequence;
 	}
+
+	public char getSymbol()
+	{
+		return symbol.charAt(0);
+
+	}
+
+	public void usePattern()
+	{
+		patternCount--;
+
+	}
+
+	public int getAttempts()
+	{
+		return patternCount;
+
+	}
+
 }
 
 class Cell {
